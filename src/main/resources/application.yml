@@ -3,18 +3,30 @@ spring:
   application:
     name: Middleware
 
+  main:
+    allow-bean-definition-overriding: true
+
   datasource:
-    url: jdbc:mysql://localhost:3306/middleware_db?connectionAttributes=transactionIsolation=REPEATABLE-READ
+    url: jdbc:mysql://localhost:3306/middleware_db?createDatabaseIfNotExist=true
     username: user
     password: password
-    driver-class-name: com.mysql.cj.jdbc.Driver     # MySQL driver
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
-    jpa:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
       hibernate:
-        ddl-auto: update                              # Options: validate | update | create | create-drop
-      show-sql: true                                  # Enable to view SQL queries in the logs
-      properties:
-        hibernate:
-          format_sql: true                            # Format SQL queries for readability
-    config:
-      import: optional:file:.env[.properties]
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  config:
+    import: optional:file:.env[.properties]
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-time: ${JWT_EXPIRATION_TIME}
+  refresh-expiration-time: ${REFRESH_EXPIRATION_TIME}
+
+

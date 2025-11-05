@@ -1,5 +1,6 @@
 package com.edos.Middleware.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.Instant;
@@ -7,14 +8,12 @@ import java.time.LocalDateTime;
 
 @Data
 public class Alert {
-    private LocalDateTime timestamp;
-    private String alertId;
+    private String id;
+    private String timestamp;
+    private String type;
+    private Model model;
     private Event event;
     private Source source;
-    private Destination destination;
-    private Model model;
-    private String rawLogRef;
-    private String recommendation;
-    private SystemInfo system;
+    private Source destination;
 
 }
