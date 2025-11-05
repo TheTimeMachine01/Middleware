@@ -1,0 +1,20 @@
+
+spring:
+  application:
+    name: Middleware
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/middleware_db?connectionAttributes=transactionIsolation=REPEATABLE-READ
+    username: user
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver     # MySQL driver
+
+    jpa:
+      hibernate:
+        ddl-auto: update                              # Options: validate | update | create | create-drop
+      show-sql: true                                  # Enable to view SQL queries in the logs
+      properties:
+        hibernate:
+          format_sql: true                            # Format SQL queries for readability
+    config:
+      import: optional:file:.env[.properties]

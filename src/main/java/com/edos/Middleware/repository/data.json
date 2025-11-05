@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-10-07T12:34:56Z",
+  "alert_id": "f8c2e6d7-22af-4b7a-a9a3-0bbf7439ef4a",
+  "event": {
+    "kind": "alert",
+    "category": "network",
+    "action": "edos_attack_detected"
+  },
+  "source": {
+    "ip": "203.0.113.17",
+    "port": 443,
+    "geo": {
+      "country_iso": "US",
+      "region": "California",
+      "city": "Los Angeles"
+    }
+  },
+  "destination": {
+    "ip": "10.0.0.5",
+    "port": 80
+  },
+  "model": {
+    "name": "I-MPaFS-RF",
+    "version": "v3.2.1",
+    "probability": 0.96,
+    "threshold": 0.85,
+    "features_used": [
+      "requests_per_minute",
+      "avg_pkt_size",
+      "url_entropy"
+    ]
+  },
+  "raw_log_ref": "logs-2025.10.07/_doc/123456",
+  "recommendation": "Throttle source IP or enable rate limiting.",
+  "system": {
+    "vm_id": "vm-frontend-02",
+    "service": "nginx",
+    "cloud": "azure"
+  }
+}
+
+

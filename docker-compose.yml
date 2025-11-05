@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0  # Use the latest stable MySQL image
+    container_name: mysql_container
+    ports:
+      - "3306:3306"  # Expose MySQL on port 3306
+    environment:
+      MYSQL_ROOT_PASSWORD: password  # Replace with a strong password
+      MYSQL_DATABASE: middleware_db      # Database name
+      MYSQL_USER: user                   # Custom user
+      MYSQL_PASSWORD: password       # Password for the custom user
+    volumes:
+      - mysql_data:/var/lib/mysql  # Persist MySQL data
+    networks:
+      - app_network # Assign to the app_network
+    healthcheck: # Healthcheck to ensure DB is ready before app starts
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10 # Increase retries for database startup
+
+# Define Volumes
+volumes:
+  mysql_data:
+
+# Define Network
+networks:
+  app_network:
+    driver: bridge
