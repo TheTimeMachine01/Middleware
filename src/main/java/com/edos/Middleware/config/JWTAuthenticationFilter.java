@@ -1,5 +1,6 @@
 package com.edos.Middleware.config;
 
+import com.edos.Middleware.entity.User.Employee;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
@@ -27,7 +28,6 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private UserDetailsService userDetailsService;
 
-    //Constructor
     public JWTAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserDetailsService userDetailsService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userDetailsService = userDetailsService;
@@ -38,50 +38,42 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         try {
-            // Get JWT token from HTTP request
             String token = getTokenFromRequest(request);
 
-            // Validate Token
             if(StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)){
-                // get username from token
                 String username = jwtTokenProvider.getUsername(token);
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
 
-                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                if (userDetails instanceof Employee) {
+                    UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+
+                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                }
             }
-
         } catch (ExpiredJwtException ex) {
-            // Log the exception for debugging
             System.err.println("JWT token expired:" + ex.getMessage());
-            // Set an attribute on the request to signal the expiry
+            request.setAttribute("expired", true);
             request.setAttribute("exception", ex);
         } catch (Exception ex) {
-            // For other JWT-related exceptions
             System.err.println("JWT token validation failed:" + ex.getMessage());
             request.setAttribute("exception", ex);
         }
 
-
-
         filterChain.doFilter(request, response);
     }
 
-    // Extract the token
     private String getTokenFromRequest(HttpServletRequest request){
         String bearerToken = request.getHeader("Authorization");
 
         if(StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")){
-            return bearerToken.substring(7, bearerToken.length());
+            return bearerToken.substring(7);
         }
 
         return null;
     }
 }
-
-

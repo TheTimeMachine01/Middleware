@@ -19,15 +19,22 @@ public class OperationController {
     private SecurityUtils securityUtils;
 
     @GetMapping("/me")
-    public ResponseEntity<CurrentUser> currentAuthenticatedUser() {
+    public ResponseEntity<?> currentAuthenticatedUser() {
+        try {
+            Employee authenticatedUser = securityUtils.getAuthenticatedUser();
 
-        Employee authenticatedUser = securityUtils.getAuthenticatedUser();
+            CurrentUser currentUser = new CurrentUser();
+            currentUser.setId(authenticatedUser.getId());
+            currentUser.setName(authenticatedUser.getName());
+            currentUser.setEmail(authenticatedUser.getEmail());
+            currentUser.setRoles(authenticatedUser.getRoles());
 
-        CurrentUser currentUser = new CurrentUser();
-        currentUser.setId(authenticatedUser.getId());
-        currentUser.setName(authenticatedUser.getName());
-
-        return new ResponseEntity<>(currentUser, HttpStatus.OK);
+            return ResponseEntity.ok(currentUser);
+        } catch (RuntimeException e) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Authentication failed: " + e.getMessage());
+        }
     }
 
     @GetMapping("/detailedMe")

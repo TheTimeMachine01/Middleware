@@ -7,4 +7,6 @@ public class CurrentUser {
 
     private long Id;
     private String name;
+    private String email;
+    private Object roles;
 }

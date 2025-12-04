@@ -1,14 +1,24 @@
 package com.edos.Middleware.entity;
 
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @Table(name = "alert")
 public class Alert {
-    private Long id;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    private Users users;
+
     private Integer event_id; // from event entity
     private LocalDateTime timestamp;
 
