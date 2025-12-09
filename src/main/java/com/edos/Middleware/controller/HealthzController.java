@@ -12,7 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-public class HealthController {
+public class HealthzController {
 
     @Autowired
     private SecurityAlertRepository repository;
@@ -32,4 +32,3 @@ public class HealthController {
         return ResponseEntity.ok(status);
     }
 }
-
