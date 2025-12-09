@@ -99,6 +99,21 @@ public class AlertService {
             event.put("detectedAt", savedAlert.getDetectedAt());
             // include raw prediction if available
             event.put("raw", savedAlert.getRawData());
+            // add geo coordinates (best-effort) using GeoIpService
+            try {
+                if (savedAlert.getSourceIp() != null) {
+                    geoIpService.lookupLatLon(savedAlert.getSourceIp()).ifPresent(coords -> {
+                        event.put("srcLat", coords[0]);
+                        event.put("srcLon", coords[1]);
+                    });
+                }
+                if (savedAlert.getTargetIp() != null) {
+                    geoIpService.lookupLatLon(savedAlert.getTargetIp()).ifPresent(coords -> {
+                        event.put("dstLat", coords[0]);
+                        event.put("dstLon", coords[1]);
+                    });
+                }
+            } catch (Exception ignored) {}
             messagingTemplate.convertAndSend("/topic/network-monitor/events", event);
         } catch (Exception ignored) {
             // Do not break processing on websocket failures
@@ -236,9 +251,19 @@ public class AlertService {
                 evt.put("timestamp", Instant.now().toString());
                 // geo information (if request contains it under a source object) - best-effort
                 try {
-                    // if there's a Source/Geo attached (not in MLPredictionRequest currently), include it
-                    // else frontend can resolve IP to lat/long using a geo service.
-                    // We intentionally don't call external services here.
+                    // attempt to resolve IPs to coordinates using GeoIpService
+                    if (req.getFlow() != null && req.getFlow().getSrcIp() != null) {
+                        geoIpService.lookupLatLon(req.getFlow().getSrcIp()).ifPresent(coords -> {
+                            evt.put("srcLat", coords[0]);
+                            evt.put("srcLon", coords[1]);
+                        });
+                    }
+                    if (req.getFlow() != null && req.getFlow().getDstIp() != null) {
+                        geoIpService.lookupLatLon(req.getFlow().getDstIp()).ifPresent(coords -> {
+                            evt.put("dstLat", coords[0]);
+                            evt.put("dstLon", coords[1]);
+                        });
+                    }
                 } catch (Exception ignored) {}
 
                 messagingTemplate.convertAndSend("/topic/network-monitor/events", evt);
@@ -285,6 +310,18 @@ public class AlertService {
                 summary.put("severity", aggregatedSeverity);
                 summary.put("alertId", aggregatedAlertId.toString());
                 summary.put("timestamp", Instant.now().toString());
+                // optionally include a sample coordinate (top source) if available
+                try {
+                    if (attackPredictions > 0 && !alertsToCreate.isEmpty()) {
+                        SecurityAlert sample = alertsToCreate.get(0);
+                        if (sample.getSourceIp() != null) {
+                            geoIpService.lookupLatLon(sample.getSourceIp()).ifPresent(coords -> {
+                                summary.put("sampleSrcLat", coords[0]);
+                                summary.put("sampleSrcLon", coords[1]);
+                            });
+                        }
+                    }
+                } catch (Exception ignored) {}
                 messagingTemplate.convertAndSend("/topic/network-monitor/summary", summary);
             } catch (Exception ignored) {}
         }
@@ -315,5 +352,4 @@ public class AlertService {
 
         return repository.save(alert);
     }
-
 }

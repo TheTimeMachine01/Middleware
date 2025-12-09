@@ -40,6 +40,7 @@ public class SecurityConfig{
                 .authorizeHttpRequests((auth) -> {
                     auth.requestMatchers("/api/auth/**").permitAll(); // Allow authentication endpoints
                     auth.requestMatchers("/health").permitAll();
+                    auth.requestMatchers("/api/healthz").permitAll();
                     auth.requestMatchers("/actuator/**").permitAll();
                     auth.requestMatchers("/error").permitAll();
                     auth.requestMatchers("/ws/**").permitAll();
@@ -76,5 +77,3 @@ public class SecurityConfig{
         return configuration.getAuthenticationManager();
     }
 }
-
-

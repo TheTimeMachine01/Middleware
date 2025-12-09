@@ -5,6 +5,9 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
   build-and-deploy:
@@ -32,6 +35,9 @@ jobs:
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_EXPIRATION_TIME: 3600000
       REFRESH_EXPIRATION_TIME: 86400000
+      # Test user credentials for authenticated smoke tests (store these as repo secrets)
+      TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+      TEST_USER_PASS: ${{ secrets.TEST_USER_PASS }}
 
     steps:
       - name: Checkout repository
@@ -42,6 +48,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Install jq (for JSON parsing)
+        run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Cache Maven local repository
         uses: actions/cache@v4
@@ -62,9 +71,9 @@ jobs:
 
       - name: Wait for application to be reachable
         run: |
-          echo "Waiting up to 120s for app to respond on http://localhost:8080/api/alerts/latest"
+          echo "Waiting up to 120s for app to respond on http://localhost:8080/api/healthz"
           for i in $(seq 1 60); do
-            if curl -sSf http://localhost:8080/api/alerts/latest -o /dev/null; then
+            if curl -sSf http://localhost:8080/api/healthz -o /dev/null; then
               echo "Application is up"
               exit 0
             fi
@@ -74,10 +83,34 @@ jobs:
           tail -n +1 app.log || true
           exit 1
 
-      - name: Run smoke test (GET /api/alerts/latest)
+      - name: Run smoke test (GET /api/healthz)
         run: |
-          echo "Running smoke test against /api/alerts/latest"
-          curl -v --fail http://localhost:8080/api/alerts/latest
+          echo "Running smoke test against /api/healthz"
+          curl -v --fail http://localhost:8080/api/healthz
+
+      - name: Register test user for authenticated tests
+        env:
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASS: ${{ secrets.TEST_USER_PASS }}
+        run: |
+          echo "Registering test user $TEST_USER_EMAIL"
+          curl -s -X POST "http://localhost:8080/api/auth/register" -H "Content-Type: application/json" -d \
+            "{\"name\":\"CI Test\",\"email\":\"$TEST_USER_EMAIL\",\"password\":\"$TEST_USER_PASS\"}" || true
+
+      - name: Obtain JWT access token
+        env:
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASS: ${{ secrets.TEST_USER_PASS }}
+        run: |
+          echo "Logging in as $TEST_USER_EMAIL"
+          resp=$(curl -s -X POST "http://localhost:8080/api/auth/login" -H "Content-Type: application/json" -d "{\"email\":\"$TEST_USER_EMAIL\",\"password\":\"$TEST_USER_PASS\"}")
+          echo "Login response: $resp"
+          echo "ACCESS_TOKEN=$(echo $resp | jq -r '.accessToken')" >> $GITHUB_ENV
+
+      - name: Run authenticated smoke test (GET /api/alerts/latest)
+        run: |
+          echo "Using token: ${ACCESS_TOKEN:0:10}..."
+          curl -v --fail -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/api/alerts/latest || true
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -121,4 +154,3 @@ jobs:
 #   SPRING_DATASOURCE_URL/DB_USER/DB_PASS which are set above to match the service values.
 # - If your application requires additional environment variables (API keys, external services), store them
 #   in GitHub Secrets and add them to the job env above.
-
