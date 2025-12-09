@@ -17,6 +17,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,12 @@ public class AlertService {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate; // used to push live events to websocket clients
+
+    @Autowired
+    private GeoIpService geoIpService;
 
     public Alert getLatestAlert() throws Exception {
         ClassPathResource resource = new ClassPathResource("data.json");
@@ -77,6 +84,25 @@ public class AlertService {
         }
 
         SecurityAlert savedAlert = repository.save(alert);
+
+        // send a live websocket event for this single alert
+        try {
+            Map<String, Object> event = new LinkedHashMap<>();
+            event.put("type", "alert");
+            event.put("id", savedAlert.getId().toString());
+            event.put("severity", savedAlert.getSeverity());
+            event.put("title", savedAlert.getTitle());
+            event.put("description", savedAlert.getDescription());
+            event.put("source_ip", savedAlert.getSourceIp());
+            event.put("target_ip", savedAlert.getTargetIp());
+            event.put("confidence", savedAlert.getConfidenceScore());
+            event.put("detectedAt", savedAlert.getDetectedAt());
+            // include raw prediction if available
+            event.put("raw", savedAlert.getRawData());
+            messagingTemplate.convertAndSend("/topic/network-monitor/events", event);
+        } catch (Exception ignored) {
+            // Do not break processing on websocket failures
+        }
 
         MLAlertResponse response = new MLAlertResponse(
                 "Alert created from ML prediction",
@@ -172,13 +198,100 @@ public class AlertService {
                 .collect(Collectors.toList());
 
         int attackPredictions = alertsToCreate.size();
+        double attackPercentage = totalPredictions == 0 ? 0.0 : (attackPredictions * 100.0) / totalPredictions;
 
+        // Determine aggregated severity from attackPercentage
+        String aggregatedSeverity;
+        if (attackPercentage >= 75.0) {
+            aggregatedSeverity = "CRITICAL";
+        } else if (attackPercentage >= 50.0) {
+            aggregatedSeverity = "HIGH";
+        } else if (attackPercentage >= 25.0) {
+            aggregatedSeverity = "MEDIUM";
+        } else if (attackPercentage > 0.0) {
+            aggregatedSeverity = "LOW";
+        } else {
+            aggregatedSeverity = "NONE";
+        }
+
+        // Create individual alerts for each attack prediction (existing behavior)
         if (!alertsToCreate.isEmpty()) {
             repository.saveAll(alertsToCreate);
         }
 
+        // send per-attack events to websocket subscribers (if any)
+        try {
+            for (MLPredictionRequest req : requests) {
+                if (req.getPrediction() == null || !req.getPrediction().isAttack()) continue;
+                Map<String, Object> evt = new LinkedHashMap<>();
+                evt.put("type", "event");
+                evt.put("resourceId", req.getResourceId() != null ? req.getResourceId().toString() : null);
+                evt.put("srcIp", req.getFlow() != null ? req.getFlow().getSrcIp() : null);
+                evt.put("dstIp", req.getFlow() != null ? req.getFlow().getDstIp() : null);
+                evt.put("srcPort", req.getFlow() != null ? req.getFlow().getSrcPort() : null);
+                evt.put("dstPort", req.getFlow() != null ? req.getFlow().getDstPort() : null);
+                evt.put("attackType", req.getPrediction().getAttackType());
+                evt.put("confidence", req.getPrediction().getConfidence());
+                evt.put("details", req.getPrediction().getDetails());
+                evt.put("timestamp", Instant.now().toString());
+                // geo information (if request contains it under a source object) - best-effort
+                try {
+                    // if there's a Source/Geo attached (not in MLPredictionRequest currently), include it
+                    // else frontend can resolve IP to lat/long using a geo service.
+                    // We intentionally don't call external services here.
+                } catch (Exception ignored) {}
+
+                messagingTemplate.convertAndSend("/topic/network-monitor/events", evt);
+            }
+        } catch (Exception ignored) {}
+
+        // Optionally create a single aggregated alert for the batch when severity is at least MEDIUM
+        boolean aggregatedAlertCreated = false;
+        UUID aggregatedAlertId = null;
+        if (!aggregatedSeverity.equals("NONE") && !aggregatedSeverity.equals("LOW")) {
+            SecurityAlert batchAlert = new SecurityAlert();
+            batchAlert.setId(UUID.randomUUID());
+            aggregatedAlertId = batchAlert.getId();
+            batchAlert.setUserId(userId);
+            batchAlert.setTitle("Aggregated ML Batch Alert: " + aggregatedSeverity);
+            batchAlert.setDescription(String.format("Batch processed: %d total, %d attacks (%.2f%%) -> %s",
+                    totalPredictions, attackPredictions, attackPercentage, aggregatedSeverity));
+            batchAlert.setSeverity(aggregatedSeverity);
+            batchAlert.setCategory("network-batch");
+            batchAlert.setStatus(AlertStatus.NEW);
+            batchAlert.setRead(false);
+            batchAlert.setDetectedAt(Instant.now());
+            batchAlert.setDetectionMethod("ML_BATCH");
+            batchAlert.setConfidenceScore(BigDecimal.valueOf(attackPercentage));
+            try {
+                batchAlert.setRawData(objectMapper.writeValueAsString(Map.of(
+                        "total", totalPredictions,
+                        "attackCount", attackPredictions,
+                        "attackPercentage", attackPercentage
+                )));
+            } catch (JsonProcessingException e) {
+                batchAlert.setRawData("{\"error\": \"Failed to serialize batch metadata\"}");
+            }
+            repository.save(batchAlert);
+            aggregatedAlertCreated = true;
+
+            // send aggregated summary over websocket as well
+            try {
+                Map<String, Object> summary = new LinkedHashMap<>();
+                summary.put("type", "summary");
+                summary.put("totalPredictions", totalPredictions);
+                summary.put("attackPredictions", attackPredictions);
+                summary.put("attackPercentage", attackPercentage);
+                summary.put("severity", aggregatedSeverity);
+                summary.put("alertId", aggregatedAlertId.toString());
+                summary.put("timestamp", Instant.now().toString());
+                messagingTemplate.convertAndSend("/topic/network-monitor/summary", summary);
+            } catch (Exception ignored) {}
+        }
+
         String message = String.format("Processed %d predictions, created %d alerts", totalPredictions, attackPredictions);
-        return new BatchPredictionResponseDto(message, totalPredictions, attackPredictions, attackPredictions);
+        return new BatchPredictionResponseDto(message, totalPredictions, attackPredictions, attackPercentage,
+                aggregatedSeverity, aggregatedAlertCreated, aggregatedAlertId != null ? aggregatedAlertId.toString() : null);
     }
 
     public SecurityAlert createManualAlert(Map<String, Object> payload, Long userId) {

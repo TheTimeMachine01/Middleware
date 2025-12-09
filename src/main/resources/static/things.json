@@ -1,0 +1,31 @@
+{
+  "predictions": [
+    {
+      "is_attack": false,
+      "attack_probability": 0.029735195591423468,
+      "benign_probability": 0.9702648044085765,
+      "confidence": 0.9702648044085765,
+      "model_version": "I-MPaFS-BeastMode-v2.0",
+      "base_model_scores": {
+        "pred_dt": 0,
+        "pred_rf": 0.017241379310344827,
+        "pred_xgb": 0.000002203739995820797,
+        "pred_lgbm": 0.000007876391860906415,
+        "pred_mlp": 0
+      },
+      "explanation": {
+        "top_base_model": "pred_rf",
+        "top_base_score": 0.017241379310344827,
+        "decision_threshold": 0.022
+      }
+    }
+  ],
+  "statistics": {
+    "total_flows": 1,
+    "attack_predictions": 0,
+    "benign_predictions": 1,
+    "processing_time_ms": 193.6032772064209,
+    "throughput_flows_per_sec": 5.165201821112741,
+    "average_confidence": 0.9702648044085765
+  }
+}

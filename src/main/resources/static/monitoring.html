@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<h1>Live Monitoring Feed</h1>
+<pre id="monitoring-data"></pre>
+
+<script type="text/javascript">
+    let stompClient = null;
+
+    function connect() {
+        // Use SockJS to connect to the /ws endpoint
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            console.log('Connected: ' + frame);
+
+            // Subscribe to the /topic/monitoring destination
+            stompClient.subscribe('/topic/monitoring', function (message) {
+                // When a message arrives, parse it and display it
+                const data = JSON.parse(message.body);
+                showMonitoringData(data);
+            });
+        });
+    }
+
+    function showMonitoringData(data) {
+        const dataElement = document.getElementById('monitoring-data');
+        // Pretty-print the JSON object
+        dataElement.textContent = JSON.stringify(data, null, 2);
+    }
+
+    // Connect when the page loads
+    connect();
+</script>
+</body>
+</html>

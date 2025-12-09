@@ -1,0 +1,124 @@
+# GitHub Actions CI/CD pipeline: build, smoke-test, dockerize and push to Docker Hub
+# Triggers on push to main
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: middleware_db
+          MYSQL_USER: user
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -hlocalhost -uuser -ppassword"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+
+    env:
+      # These environment variables are used by Spring Boot during the build/run steps in CI
+      SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/middleware_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: user
+      DB_PASS: password
+      # Sensitive values should be stored in GitHub Secrets (see README below)
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_EXPIRATION_TIME: 3600000
+      REFRESH_EXPIRATION_TIME: 86400000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Build with Maven (package)
+        run: mvn -B -DskipTests package
+
+      - name: Start application (background)
+        run: |
+          echo "Starting Spring Boot application..."
+          nohup java -jar target/*.jar > app.log 2>&1 &
+          echo $! > app.pid
+
+      - name: Wait for application to be reachable
+        run: |
+          echo "Waiting up to 120s for app to respond on http://localhost:8080/api/alerts/latest"
+          for i in $(seq 1 60); do
+            if curl -sSf http://localhost:8080/api/alerts/latest -o /dev/null; then
+              echo "Application is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Application did not respond in time - dumping app.log"
+          tail -n +1 app.log || true
+          exit 1
+
+      - name: Run smoke test (GET /api/alerts/latest)
+        run: |
+          echo "Running smoke test against /api/alerts/latest"
+          curl -v --fail http://localhost:8080/api/alerts/latest
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/middleware:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/middleware:${{ github.sha }}
+          file: Dockerfile
+          build-args: |
+            JAR_FILE=target/*.jar
+        env:
+          DOCKER_BUILDKIT: 1
+
+      - name: Stop application (cleanup)
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill $(cat app.pid) || true
+            rm -f app.pid
+          fi
+
+      - name: Upload app.log (for debugging on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log
+          path: app.log
+
+
+# Notes for repository owner:
+# - Add the following repository secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN, JWT_SECRET
+# - The workflow uses a MySQL service inside the runner; the Spring Boot app reads DB connection details from
+#   SPRING_DATASOURCE_URL/DB_USER/DB_PASS which are set above to match the service values.
+# - If your application requires additional environment variables (API keys, external services), store them
+#   in GitHub Secrets and add them to the job env above.
+
