@@ -8,7 +8,7 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  test-and-deploy:
+  test-and-push-docker:
     runs-on: ubuntu-latest
     
     steps:
@@ -106,13 +106,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trigger Render.com Deploy Hook
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          echo "Triggering Render.com deploy hook..."
-          curl -s -X POST "${{ secrets.RENDER_HOOK }}"
-
       - name: Cleanup
         if: always()
         run: |
           docker compose -f docker-compose.ci.yml down -v || true
+
+  deploy:
+    needs: test-and-push-docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render.com Deploy Hook
+        run: |
+          echo "Triggering Render.com deploy hook..."
+          curl -s -X POST "${{ secrets.RENDER_HOOK }}"
