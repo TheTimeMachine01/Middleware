@@ -11,8 +11,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class SecurityUtils {
 
-    @Autowired
     private static EmployeeService employeeService;
+
+    @Autowired
+    public SecurityUtils(EmployeeService employeeService) {
+        SecurityUtils.employeeService = employeeService;
+    }
 
     /**
      * Retrieves the authenticated Employee object from the SecurityContext.
