@@ -37,29 +37,12 @@ jobs:
       - name: Run testing container (with dependencies)
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-secret-key-at-least-256-bits-long' }}
+          JWT_EXPIRATION_TIME: ${{ secrets.JWT_EXPIRATION_TIME || '3600000' }}
+          REFRESH_EXPIRATION_TIME: ${{ secrets.REFRESH_EXPIRATION_TIME || '86400000' }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY || 'test-key' }}
         run: |
-          # Use docker-compose to start the application and its dependencies
-          # We override the 'middleware' image to use the one we just built
-          docker compose up -d postgres redis
-          
-          # Wait for dependencies to be healthy
-          echo "Waiting for PostgreSQL and Redis to be healthy..."
-          sleep 10
-          
-          # Run the application container
-          docker run -d --name middleware-test-container \
-            --network middleware_app_network \
-            -p 8080:8080 \
-            -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/middleware_db \
-            -e DB_USER=user \
-            -e DB_PASS=password \
-            -e REDIS_HOST=redis \
-            -e REDIS_PORT=6379 \
-            -e REDIS_SSL=false \
-            -e JWT_SECRET=$JWT_SECRET \
-            -e NVIDIA_API_KEY=$NVIDIA_API_KEY \
-            middleware-test:latest
+          # Use our CI-specific docker-compose file to start everything
+          docker compose -f docker-compose.ci.yml up -d
 
       - name: Wait for application to be healthy
         run: |
@@ -80,7 +63,7 @@ jobs:
             sleep 2
           done
           echo "Application failed health check - dumping container logs"
-          docker logs middleware-test-container
+          docker compose -f docker-compose.ci.yml logs middleware
           exit 1
 
       - name: Run basic smoke test (authenticated login)
@@ -122,6 +105,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker stop middleware-test-container || true
-          docker rm middleware-test-container || true
-          docker compose down -v || true
+          docker compose -f docker-compose.ci.yml down -v || true
