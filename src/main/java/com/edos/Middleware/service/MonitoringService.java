@@ -21,12 +21,6 @@ public class MonitoringService {
     private SimpMessagingTemplate messagingTemplate;
 
     @Autowired
-    private Statistics statistics;
-
-    @Autowired
-    private Prediction prediction;
-
-    @Autowired
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
 

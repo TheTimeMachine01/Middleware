@@ -42,6 +42,10 @@ jobs:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY || 'test-key' }}
         run: |
           # Use our CI-specific docker-compose file to start everything
+          export JWT_SECRET=$JWT_SECRET
+          export JWT_EXPIRATION_TIME=$JWT_EXPIRATION_TIME
+          export REFRESH_EXPIRATION_TIME=$REFRESH_EXPIRATION_TIME
+          export NVIDIA_API_KEY=$NVIDIA_API_KEY
           docker compose -f docker-compose.ci.yml up -d
 
       - name: Wait for application to be healthy
