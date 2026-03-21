@@ -65,6 +65,8 @@ public class AlertService {
         var prediction = request.getPrediction();
         alert.setConfidenceScore(BigDecimal.valueOf(prediction.getConfidence() * 100.0));
         alert.setDetectionMethod("ML_PREDICTION_" + prediction.getModelVersion());
+        alert.setAttackType(prediction.getAttackType());
+        alert.setDetails(prediction.getDetails());
 
         // Set default/derived values
         String severity = calculateSeverity(prediction.getConfidence(), prediction.getAttackProbability());
@@ -171,7 +173,71 @@ public class AlertService {
         dto.setTarget_port(e.getTargetPort());
         dto.setDetection_method(e.getDetectionMethod());
         dto.setRead(e.getRead());
+        dto.setAttack_type(e.getAttackType());
+        dto.setDetails(e.getDetails());
+
+        // Format time as "MM/dd HH:mm" for the 'time' field
+        if (e.getDetectedAt() != null) {
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter
+                    .ofPattern("MM/dd HH:mm")
+                    .withZone(java.time.ZoneId.systemDefault());
+            dto.setTime(formatter.format(e.getDetectedAt()));
+        }
+
         return dto;
+    }
+
+    public Optional<SecurityAlertDto> findAlertById(UUID id, Long userId) {
+        return repository.findById(id)
+                .filter(alert -> alert.getUserId().equals(userId))
+                .map(this::toDto);
+    }
+
+    @Transactional
+    public boolean markAsRead(UUID id, Long userId) {
+        return repository.findById(id)
+                .filter(alert -> alert.getUserId().equals(userId))
+                .map(alert -> {
+                    alert.setRead(true);
+                    repository.save(alert);
+                    return true;
+                }).orElse(false);
+    }
+
+    @Transactional
+    public void markAllAsRead(Long userId) {
+        List<SecurityAlert> unread = repository.findAll((root, query, cb) ->
+                cb.and(cb.equal(root.get("userId"), userId), cb.equal(root.get("read"), false)));
+        unread.forEach(alert -> alert.setRead(true));
+        repository.saveAll(unread);
+    }
+
+    @Transactional
+    public boolean deleteAlert(UUID id, Long userId) {
+        return repository.findById(id)
+                .filter(alert -> alert.getUserId().equals(userId))
+                .map(alert -> {
+                    repository.delete(alert);
+                    return true;
+                }).orElse(false);
+    }
+
+    public Map<String, Object> getAlertStats(Long userId) {
+        List<SecurityAlert> userAlerts = repository.findAll((root, query, cb) ->
+                cb.equal(root.get("userId"), userId));
+
+        long total = userAlerts.size();
+        long unread = userAlerts.stream().filter(a -> !a.getRead()).count();
+        Map<String, Long> severityCounts = userAlerts.stream()
+                .collect(Collectors.groupingBy(SecurityAlert::getSeverity, Collectors.counting()));
+
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("total", total);
+        stats.put("unread", unread);
+        stats.put("by_severity", severityCounts);
+        stats.put("timestamp", Instant.now());
+
+        return stats;
     }
 
     private String calculateSeverity(double confidence) {
@@ -198,6 +264,8 @@ public class AlertService {
                     alert.setSourceIp(req.getFlow().getSrcIp());
                     alert.setTargetIp(req.getFlow().getDstIp());
                     alert.setTargetPort(req.getFlow().getDstPort());
+                    alert.setAttackType(req.getPrediction().getAttackType());
+                    alert.setDetails(req.getPrediction().getDetails());
                     alert.setConfidenceScore(BigDecimal.valueOf(req.getPrediction().getConfidence()));
                     alert.setDetectionMethod(req.getSource());
                     alert.setStatus(AlertStatus.NEW);

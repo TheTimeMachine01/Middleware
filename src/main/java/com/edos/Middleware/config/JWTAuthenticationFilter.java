@@ -74,6 +74,15 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
 
+        // Fallback to cookie if header is missing
+        if (request.getCookies() != null) {
+            return java.util.Arrays.stream(request.getCookies())
+                    .filter(c -> "accessToken".equals(c.getName()))
+                    .map(jakarta.servlet.http.Cookie::getValue)
+                    .findFirst()
+                    .orElse(null);
+        }
+
         return null;
     }
 }

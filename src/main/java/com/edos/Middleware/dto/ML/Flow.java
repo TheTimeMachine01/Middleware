@@ -18,5 +18,8 @@ public class Flow {
     @JsonProperty("dst_port")
     private int dstPort;
 
+    @JsonProperty("flow_duration")
+    private float flowDuration;
+
     private String protocol;
 }

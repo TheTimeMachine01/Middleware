@@ -1,5 +1,6 @@
-package com.edos.Middleware.dto;
+import lombok.Data;
 
+@Data
 public class SystemInfo {
     private String vmId;
     private String service;

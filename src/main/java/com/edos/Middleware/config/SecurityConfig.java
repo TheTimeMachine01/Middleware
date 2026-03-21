@@ -44,7 +44,9 @@ public class SecurityConfig{
                     auth.requestMatchers("/actuator/**").permitAll();
                     auth.requestMatchers("/error").permitAll();
                     auth.requestMatchers("/ws/**").permitAll();
-                    auth.anyRequest().authenticated(); // Protect all other endpoints
+                    auth.requestMatchers("/graphiql", "/graphiql/**").permitAll();
+                    auth.requestMatchers("/graphql", "/graphql/**").permitAll();
+                    auth.anyRequest().authenticated();
                 }).httpBasic(Customizer.withDefaults())
                 .sessionManagement(management -> management.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(customAuthenticationEntryPoint)) // ✅ Use your custom entry point
@@ -62,7 +64,7 @@ public class SecurityConfig{
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         var config = new org.springframework.web.cors.CorsConfiguration();
-        config.addAllowedOriginPattern("*");
+        config.setAllowedOrigins(java.util.List.of("http://localhost:3000", "http://localhost:5173")); // Common React ports
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         config.setAllowCredentials(true);

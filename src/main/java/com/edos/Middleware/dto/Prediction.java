@@ -12,6 +12,6 @@ public class Prediction {
     private double confidence;
     private String model_version;
     private Map<String, Double> base_model_scores;
-    private Map<String, Object> explanation;
+    private String explanation;
 
 }

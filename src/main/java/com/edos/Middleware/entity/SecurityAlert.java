@@ -2,6 +2,8 @@ package com.edos.Middleware.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -52,7 +54,8 @@ public class SecurityAlert {
     @Column(name = "confidence_score", precision = 5, scale = 2)
     private BigDecimal confidenceScore;
 
-    @Column(name = "raw_data", columnDefinition = "json")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_data", columnDefinition = "jsonb")
     private String rawData;
 
     @Column(name = "detected_at")
@@ -64,4 +67,10 @@ public class SecurityAlert {
 
     @Column(name = "is_read")
     private Boolean read;
+
+    @Column(name = "attack_type")
+    private String attackType;
+
+    @Column(name = "details", length = 4000)
+    private String details;
 }

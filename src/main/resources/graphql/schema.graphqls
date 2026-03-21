@@ -1,0 +1,78 @@
+type Query {
+    # Get all alerts with optional filtering and pagination
+    listAlerts(level: String, read: Boolean, limit: Int, offset: Int): [SecurityAlert]
+    
+    # Get a specific alert by ID
+    getAlertById(id: ID!): SecurityAlert
+    
+    # Get alert statistics
+    getAlertStats: AlertStats
+
+    # Get real-time system and network metrics
+    getSystemMetrics: SystemMetrics
+}
+
+type SystemMetrics {
+    statistics: Statistics
+    predictions: [Prediction]
+    timestamp: String
+}
+
+type Statistics {
+    total_flows: Int
+    attack_predictions: Int
+    benign_predictions: Int
+    processing_time_ms: Float
+    throughput_flows_per_sec: Float
+    average_confidence: Float
+}
+
+type Prediction {
+    is_attack: Boolean
+    attack_probability: Float
+    benign_probability: Float
+    confidence: Float
+    model_version: String
+    explanation: String
+}
+
+type Mutation {
+    # Mark a specific alert as read
+    markAsRead(id: ID!): Boolean
+    
+    # Mark all alerts as read for the current user
+    markAllRead: Boolean
+    
+    # Delete (dismiss) an alert
+    deleteAlert(id: ID!): Boolean
+}
+
+type SecurityAlert {
+    id: ID
+    level: String
+    message: String
+    source: String
+    timestamp: String
+    title: String
+    category: String
+    confidence: Float
+    target_ip: String
+    target_port: Int
+    detection_method: String
+    read: Boolean
+    time: String
+    attack_type: String
+    details: String
+}
+
+type AlertStats {
+    total: Int
+    unread: Int
+    by_severity: [SeverityCount]
+    timestamp: String
+}
+
+type SeverityCount {
+    severity: String
+    count: Int
+}

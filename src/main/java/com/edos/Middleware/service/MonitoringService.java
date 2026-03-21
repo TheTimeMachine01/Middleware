@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
+@org.springframework.stereotype.Service
 public class MonitoringService {
 
     @Autowired
@@ -24,6 +25,9 @@ public class MonitoringService {
 
     @Autowired
     private Prediction prediction;
+
+    @Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
 
     private final Random random = new Random();
@@ -39,6 +43,10 @@ public class MonitoringService {
 
         // Send the data to the WebSocket topic
         messagingTemplate.convertAndSend("/topic/monitoring", data);
+    }
+
+    public MonitoringData getLatestMetrics() {
+        return createMockMonitoringData();
     }
 
     /**
@@ -72,9 +80,14 @@ public class MonitoringService {
         scores.put("pred_rf", random.nextDouble() * 0.02);
         prediction.setBase_model_scores(scores);
 
-        Map<String, Object> explanation = new HashMap<>();
-        explanation.put("top_base_model", "pred_rf");
-        prediction.setExplanation(explanation);
+        Map<String, Object> explanationMap = new HashMap<>();
+        explanationMap.put("top_base_model", "pred_rf");
+        
+        try {
+            prediction.setExplanation(objectMapper.writeValueAsString(explanationMap));
+        } catch (Exception e) {
+            prediction.setExplanation("{}");
+        }
 
         data.setPredictions(Collections.singletonList(prediction));
 

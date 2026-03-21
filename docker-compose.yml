@@ -1,31 +1,66 @@
 version: '3.8'
 
 services:
-  mysql:
-    image: mysql:8.0  # Use the latest stable MySQL image
-    container_name: mysql_container
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_container
     ports:
-      - "3306:3306"  # Expose MySQL on port 3306
+      - "5432:5432"
     environment:
-      MYSQL_ROOT_PASSWORD: password  # Replace with a strong password
-      MYSQL_DATABASE: middleware_db      # Database name
-      MYSQL_USER: user                   # Custom user
-      MYSQL_PASSWORD: password       # Password for the custom user
+      POSTGRES_DB: middleware_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
     volumes:
-      - mysql_data:/var/lib/mysql  # Persist MySQL data
+      - postgres_data:/var/lib/postgresql/data
     networks:
-      - app_network # Assign to the app_network
-    healthcheck: # Healthcheck to ensure DB is ready before app starts
-      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD" ]
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d middleware_db"]
       interval: 5s
       timeout: 5s
-      retries: 10 # Increase retries for database startup
+      retries: 5
 
-# Define Volumes
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis_container
+    ports:
+      - "6379:6379"
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  middleware:
+    build: .
+    container_name: middleware_app
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/middleware_db
+      DB_USER: user
+      DB_PASS: password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_SSL: "false"
+      JWT_SECRET: ${JWT_SECRET:-your-default-secret-key-at-least-256-bits-long-change-this}
+      JWT_EXPIRATION_TIME: 3600000
+      REFRESH_EXPIRATION_TIME: 86400000
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-your-default-key}
+    networks:
+      - app_network
+
 volumes:
-  mysql_data:
+  postgres_data:
 
-# Define Network
 networks:
   app_network:
     driver: bridge

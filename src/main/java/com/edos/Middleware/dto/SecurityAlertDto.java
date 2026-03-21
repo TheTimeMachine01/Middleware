@@ -21,4 +21,7 @@ public class SecurityAlertDto {
     private Integer target_port;
     private String detection_method;
     private Boolean read;
+    private String time;
+    private String attack_type;
+    private String details;
 }

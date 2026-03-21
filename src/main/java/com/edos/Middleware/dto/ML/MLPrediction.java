@@ -24,4 +24,7 @@ public class MLPrediction {
     private Map<String, Float> baseModelScores;
     private Map<String, Object> explanation;
 
+    @JsonProperty("attack_type")
+    private String attackType;
+    private String details;
 }

@@ -91,7 +91,7 @@ public class AuthServiceImpl implements AuthService {
 
         LoginResponse loginResponse = new LoginResponse();
         loginResponse.setAccessToken(newAccessToken);
-        loginResponse.setRefreshToken(refreshToken);
+        loginResponse.setRefreshToken(newRefreshTokenString);
 
         return loginResponse;
     }

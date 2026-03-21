@@ -17,7 +17,11 @@ public class MiddlewareApplication {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    	return new BCryptPasswordEncoder();
     }
 
+    @Bean
+    public org.springframework.web.client.RestTemplate restTemplate() {
+    	return new org.springframework.web.client.RestTemplate();
+    }
 }

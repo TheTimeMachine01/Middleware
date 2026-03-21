@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/alerts")
@@ -82,5 +83,42 @@ public class AlertsController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<SecurityAlertDto> getAlertById(@PathVariable UUID id) {
+        Long userId = SecurityUtils.getAuthenticatedUser().getId();
+        return alertService.findAlertById(id, userId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 
+    @PatchMapping("/{id}/read")
+    public ResponseEntity<Void> markAsRead(@PathVariable UUID id) {
+        Long userId = SecurityUtils.getAuthenticatedUser().getId();
+        if (alertService.markAsRead(id, userId)) {
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteAlert(@PathVariable UUID id) {
+        Long userId = SecurityUtils.getAuthenticatedUser().getId();
+        if (alertService.deleteAlert(id, userId)) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PutMapping("/mark-all-read")
+    public ResponseEntity<Void> markAllRead() {
+        Long userId = SecurityUtils.getAuthenticatedUser().getId();
+        alertService.markAllAsRead(userId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getStats() {
+        Long userId = SecurityUtils.getAuthenticatedUser().getId();
+        return ResponseEntity.ok(alertService.getAlertStats(userId));
+    }
 }
