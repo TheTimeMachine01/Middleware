@@ -64,7 +64,11 @@ public class SecurityConfig{
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         var config = new org.springframework.web.cors.CorsConfiguration();
-        config.setAllowedOrigins(java.util.List.of("http://localhost:3000", "http://localhost:5173")); // Common React ports
+        config.setAllowedOrigins(java.util.List.of(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "https://stasis.ashishv.me"
+        )); // Common React ports
         config.addAllowedHeader("*");
         config.addAllowedMethod("*");
         config.setAllowCredentials(true);
