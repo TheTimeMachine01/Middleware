@@ -222,6 +222,21 @@ public class AlertService {
                 }).orElse(false);
     }
 
+    @Transactional
+    public boolean updateFeedback(UUID id, Long userId, String label, AlertStatus status) {
+        return repository.findById(id)
+                .filter(alert -> alert.getUserId().equals(userId))
+                .map(alert -> {
+                    alert.setUserLabel(label);
+                    alert.setStatus(status);
+                    if (status == AlertStatus.CONFIRMED || status == AlertStatus.FALSE_POSITIVE) {
+                        alert.setConfirmedAt(Instant.now());
+                    }
+                    repository.save(alert);
+                    return true;
+                }).orElse(false);
+    }
+
     public Map<String, Object> getAlertStats(Long userId) {
         List<SecurityAlert> userAlerts = repository.findAll((root, query, cb) ->
                 cb.equal(root.get("userId"), userId));

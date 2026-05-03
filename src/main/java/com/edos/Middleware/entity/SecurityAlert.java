@@ -73,4 +73,10 @@ public class SecurityAlert {
 
     @Column(name = "details", length = 4000)
     private String details;
+
+    @Column(name = "user_label")
+    private String userLabel;
+
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
 }

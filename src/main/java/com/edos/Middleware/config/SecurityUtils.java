@@ -57,4 +57,8 @@ public class SecurityUtils {
             return false;
         }
     }
+
+    public Long getCurrentUserId() {
+        return getAuthenticatedUser().getId();
+    }
 }

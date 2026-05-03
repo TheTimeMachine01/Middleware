@@ -5,6 +5,7 @@ public enum AlertStatus {
     INVESTIGATING,
     ACKNOWLEDGED,
     RESOLVED,
-    FALSE_POSITIVE
-
+    FALSE_POSITIVE,
+    CONFIRMED,
+    DISMISSED
 }
